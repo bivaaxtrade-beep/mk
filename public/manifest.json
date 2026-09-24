@@ -1,0 +1,50 @@
+{
+  "name": "Bivaax Trade - Official Trading App",
+  "short_name": "Bivaax",
+  "id": "com.bivaax.trade",
+  "description": "Official Bivaax Trade App. Trade Forex, Crypto, Stocks, and Commodities with real-time charts, fast execution, and a free $10,000 demo balance.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d0e12",
+  "theme_color": "#0d0e12",
+  "categories": ["finance", "business", "productivity"],
+  "icons": [
+    {
+      "src": "https://i.postimg.cc/6p1dmLjB/IMG-20260822-005000-661.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.postimg.cc/6p1dmLjB/IMG-20260822-005000-661.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Trade Terminal",
+      "short_name": "Trade",
+      "description": "Open live trading charts and markets",
+      "url": "/trade",
+      "icons": [{ "src": "https://i.postimg.cc/6p1dmLjB/IMG-20260822-005000-661.jpg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Download App",
+      "short_name": "App",
+      "description": "Install official Bivaax Mobile & Web App",
+      "url": "/app",
+      "icons": [{ "src": "https://i.postimg.cc/6p1dmLjB/IMG-20260822-005000-661.jpg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Create Account",
+      "short_name": "Register",
+      "description": "Open a free $10,000 demo account",
+      "url": "/register",
+      "icons": [{ "src": "https://i.postimg.cc/6p1dmLjB/IMG-20260822-005000-661.jpg", "sizes": "192x192" }]
+    }
+  ]
+}

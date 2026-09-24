@@ -1,0 +1,12 @@
+{
+  "name": "Bivaax Trade | Professional Trading Platform",
+  "description": "Join Bivaax Trade, the world's leading professional trading platform. Claim your 100% deposit bonus with promo code BIVAAX100. Trade Binary Options, Forex, and Crypto with high yields, 24/7 expert support, and secure instant payouts. Start your financial journey with the leading global trading ecosystem.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API",
+    "MAJOR_CAPABILITY_CLOUD_SQL"
+  ]
+}

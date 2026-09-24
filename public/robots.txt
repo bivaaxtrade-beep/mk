@@ -1,0 +1,39 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /profile
+Disallow: /cashier
+Disallow: /deposit
+Disallow: /withdraw
+
+# Google Search & Google AI (Gemini / Google-Extended / SGE)
+User-agent: Googlebot
+Allow: /
+User-agent: Googlebot-Image
+Allow: /
+User-agent: Google-Extended
+Allow: /
+
+# OpenAI / ChatGPT / Perplexity / Claude AI Crawlers
+User-agent: GPTBot
+Allow: /
+User-agent: ChatGPT-User
+Allow: /
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: anthropic-ai
+Allow: /
+User-agent: bingbot
+Allow: /
+User-agent: Applebot
+Allow: /
+
+# LLM Text Summaries
+Allow: /llms.txt
+Allow: /llms-full.txt
+
+Sitemap: https://bivaax.com/sitemap.xml

@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.sqlite.corrupted*
+backups/
+temp_repo/
+local_db.json

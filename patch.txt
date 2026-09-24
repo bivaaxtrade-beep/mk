@@ -1,0 +1,40 @@
+--- src/App.tsx
++++ src/App.tsx
+@@ -531,9 +531,6 @@
+         if (u && !syncInProgress) {
+           syncInProgress = true;
+           
+-          // Wait a bit to allow server to settle
+-          await new Promise(resolve => setTimeout(resolve, 2000));
+-          
+           const safeFetch = async (url: string, options?: RequestInit, retries = 3) => {
+             for (let i = 0; i < retries; i++) {
+               try {
+@@ -570,14 +567,14 @@
+           console.log("Starting health check...");
+           let healthData = { status: 'pending' };
+-          for (let i = 0; i < 5; i++) {
++          for (let i = 0; i < 2; i++) {
+             const data = await safeFetch('/api/health');
+             if (data && data.status === 'ok') {
+               healthData = data;
+               break;
+             }
+             console.warn(`Health check attempt ${i+1} failed, retrying...`);
+-            await new Promise(r => setTimeout(r, 1000));
++            await new Promise(r => setTimeout(r, 500));
+           }
+ 
+           if (healthData.status !== 'ok') {
+@@ -631,7 +628,12 @@
+           } catch (err) {
+             console.warn("Server 2FA check failed, falling back to direct Firestore...");
+             try {
+-               const userSnap = await getDoc(doc(db, 'users', u.uid));
++               const userSnap: any = await Promise.race([
++                 getDoc(doc(db, 'users', u.uid)),
++                 new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), 3000))
++               ]);
+                if (userSnap.exists()) {
+                   const data = userSnap.data();
+                   if (data.tfaEnabled) {

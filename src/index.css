@@ -1,0 +1,179 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+html, body {
+  background-color: #050507;
+  color: #ffffff;
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum", "zero";
+}
+
+/* Force High DPI Canvas sharp edge rendering for crystal clear screen recording */
+canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  transform: translateZ(0); /* GPU hardware acceleration layer */
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Ultra Sharp SVG Vector Lines & Text Rendering */
+svg {
+  shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
+  image-rendering: optimizeQuality;
+}
+
+@theme {
+  --animate-spin-reverse: spin-reverse 1s linear infinite;
+
+  @keyframes spin-reverse {
+    from {
+      transform: rotate(360deg);
+    }
+    to {
+      transform: rotate(0deg);
+    }
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+  }
+
+  @keyframes shimmer-sweep {
+    0% { transform: translateX(-150%) skewX(-25deg); }
+    100% { transform: translateX(250%) skewX(-25deg); }
+  }
+
+  @keyframes binomo-3d-pop {
+    0% {
+      opacity: 0;
+      transform: perspective(600px) rotateX(25deg) rotateY(-12deg) scale(0.6) translateY(40px);
+    }
+    40% {
+      opacity: 1;
+      transform: perspective(600px) rotateX(12deg) rotateY(-5deg) scale(1.08) translateY(-5px);
+    }
+    60% {
+      transform: perspective(600px) rotateX(8deg) rotateY(-3deg) scale(1) translateY(0);
+    }
+    100% {
+      opacity: 1;
+      transform: perspective(600px) rotateX(8deg) rotateY(-3deg) scale(1) translateY(0);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; filter: drop-shadow(0 0 8px rgba(255,255,255,0.05)); }
+    50% { opacity: 0.7; filter: drop-shadow(0 0 15px rgba(255,255,255,0.15)); }
+  }
+
+  @keyframes gimbal-radar-pulse {
+    0% {
+      r: 3px;
+      opacity: 1;
+      stroke-width: 2.5px;
+    }
+    50% {
+      r: 9px;
+      opacity: 0.55;
+      stroke-width: 1.5px;
+    }
+    100% {
+      r: 16px;
+      opacity: 0;
+      stroke-width: 0.5px;
+    }
+  }
+}
+
+.animate-gimbal-radar {
+  animation: gimbal-radar-pulse 1.35s cubic-bezier(0.2, 0.9, 0.4, 1) infinite;
+}
+
+/* Custom Scrollbar for Dark Theme */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Hide scrollbar completely but allow scrolling */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Hide TradingView Attribution Logo from lightweight-charts */
+#tv-attr-logo,
+div[id^="tv-attr-logo"],
+.tv-lightweight-charts a,
+a[href*="tradingview.com"] {
+  display: none !important;
+}/* Hide TradingView attribution logo */
+.tv-lightweight-charts-watermark,
+#tv-attr-logo,
+a[href*="tradingview.com"] {
+  display: none !important;
+}
+
+@layer utilities {
+  .premium-shimmer-container {
+    position: relative;
+    overflow: hidden;
+    background-color: #222226; /* Dark gray skeleton surface */
+    isolation: isolate;
+  }
+
+  .premium-shimmer-container::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      105deg,
+      transparent 20%,
+      rgba(255, 255, 255, 0.04) 40%,
+      rgba(255, 255, 255, 0.1) 50%,
+      rgba(255, 255, 255, 0.04) 60%,
+      transparent 80%
+    );
+    animation: premium-shimmer 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  @keyframes premium-shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .premium-shimmer-container::after {
+      animation: none;
+      background-image: none;
+    }
+    .premium-shimmer-container {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+  }
+}

@@ -1,0 +1,256 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // SECURITY HELPERS
+    // -------------------------------------------------------------------------
+    
+    // Checks if a client is authenticated via Firebase Auth
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Checks if the authenticated user is the owner of the document
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Checks if the authenticated user is the absolute owner
+    function isOwner() {
+      return isSignedIn() && (
+        request.auth.token.email == "bivaaxtrade@gmail.com" ||
+        request.auth.token.email == "msbivaax@gmail.com" ||
+        request.auth.token.email == "hasan1@gmail.com" ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "owner" ||
+        request.auth.uid == "HFvr43UhRiTSjb6m5sQJHmHGNvm1"
+      );
+    }
+
+    // Checks if the authenticated user is an administrator (includes Owner)
+    function isAdmin() {
+      return isOwner() || (
+        isSignedIn() && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+          request.auth.token.email in [
+            "bivaaxtrader@gmail.com",
+            "msbivaax@gmail.com",
+            "hasan1@gmail.com"
+          ]
+        )
+      );
+    }
+
+    // Checks for granular staff permissions
+    function hasPermission(perm) {
+      return isOwner() || (
+        isAdmin() && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.permissions[perm] == true
+      );
+    }
+
+    // Checks if the authenticated user has a support role
+    function isSupport() {
+      return isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['support', 'moderator', 'agent', 'team_leader']);
+    }
+
+    // Prevents document ID poisoning by enforcing character and length limits
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // -------------------------------------------------------------------------
+    // DEFAULT SAFETY NET (Zero-Trust)
+    // -------------------------------------------------------------------------
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // COLLECTION RULES
+    // -------------------------------------------------------------------------
+
+    // 1. User Profiles & Balances
+    // Protect against self-escalation by forbidding users from modifying admin or role fields.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isSupport() || (isSignedIn() && (
+        resource.data.referredByUid == request.auth.uid ||
+        resource.data.referredBy == request.auth.uid ||
+        resource.data.referredByCode == request.auth.uid
+      ));
+      allow create: if isSignedIn() && isOwner(userId) && (
+        (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin != true) &&
+        (!('role' in request.resource.data) || request.resource.data.role == 'user')
+      );
+      allow update: if isSignedIn() && (
+        isOwner() || (
+          isOwner(userId) &&
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'role', 'isEmailVerified', 'isNidVerified', 'kyc_status', 'kycStatus']))
+        ) || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referralCount', 'totalClicks', 'impressions', 'lastClickAt'])
+        )
+      );
+      allow delete: if isOwner();
+
+      // Transactions subcollection
+      match /transactions/{txId} {
+        allow read, write: if isOwner(userId) || isSupport();
+      }
+    }
+
+    // 2. Support Tickets & Conversations
+    // Users can read and write only their own support tickets. Administrators have full access.
+    match /tickets/{ticketId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (isSupport() || (resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid));
+      allow delete: if isOwner();
+      
+      // Messages within support tickets
+      match /messages/{messageId} {
+        allow read, write: if isSignedIn() && (get(/databases/$(database)/documents/tickets/$(ticketId)).data.userId == request.auth.uid || isSupport());
+      }
+    }
+
+    // 3. Knowledge Base & Canned Responses
+    match /knowledge_base/{articleId} {
+      allow read: if true;
+      allow write: if isSupport();
+    }
+    match /canned_responses/{responseId} {
+      allow read: if isSupport();
+      allow write: if isSupport();
+    }
+
+    // 4. KYC Verification Requests
+    // Protects Personally Identifiable Information (PII) by restricting read/write to the applicant or admin.
+    match /kyc_requests/{requestId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (isOwner() || (resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid));
+      allow delete: if isOwner();
+    }
+    match /kycRequests/{requestId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && (isOwner() || (resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid));
+      allow delete: if isOwner();
+    }
+
+    // 4. Platform Config & App Settings
+    // Read-only for the public; only admins can adjust trading/system settings.
+    match /app_config/{configId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    // 5. Market Candle Data
+    // Available publicly to build trading charts; writable only by the admin system / market engine.
+    match /market_candles/{candleId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    // 6. Educational Content, News & Promotions
+    // Publicly readable; administrators handle content management.
+    match /news/{newsId} { allow read: if true; allow write: if isOwner(); }
+    match /education/{eduId} { allow read: if true; allow write: if isOwner(); }
+    match /promotions/{promoId} { allow read: if true; allow write: if isOwner(); }
+    match /banners/{bannerId} { allow read: if true; allow write: if isOwner(); }
+    match /pages/{pageId} { allow read: if true; allow write: if isOwner(); }
+
+    // 7. Trading Tournaments & Signals
+    // Publicly read; managed by system admins.
+    match /tournaments/{tournId} { allow read: if true; allow write: if isOwner(); }
+    match /signals/{signalId} { allow read: if true; allow write: if isOwner(); }
+    match /masterTraders/{traderId} { allow read: if true; allow write: if isOwner(); }
+
+    // 8. Payment & Deposit Methods
+    // Available for users to view during payment processing; manageable only by admin panel.
+    match /depositMethods/{methodId} { allow read: if true; allow write: if isOwner(); }
+    match /promoMaterials/{promoId} { allow read: if true; allow write: if isOwner(); }
+
+    // 9. Financial Actions (Deposits, Withdrawals, & Affiliates)
+    // Directly secure transactional collections from unauthorized direct write operations.
+    match /deposits/{depId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.status == 'pending';
+      allow update: if isSignedIn() && (
+        isOwner() || (
+          resource.data.userId == request.auth.uid &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['trxId'])
+        )
+      );
+      allow delete: if isOwner();
+    }
+    match /withdrawals/{withId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.status == 'pending';
+      allow update, delete: if isOwner();
+    }
+    match /affiliate_campaigns/{campId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    match /affiliate_postbacks/{pbId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    match /affiliate_payouts/{payoutId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isOwner();
+    }
+    match /affiliate_commissions/{commId} {
+      allow read: if isSignedIn() && (resource == null || resource.data.referrerUid == request.auth.uid || isAdmin());
+      allow write: if isOwner();
+    }
+    match /affiliate_clicks/{clickId} {
+      allow create: if true;
+      allow read: if isSignedIn() && (resource == null || resource.data.referrerUid == request.auth.uid || isAdmin());
+      allow update, delete: if isOwner();
+    }
+
+    // 10. System & Auditing Logs
+    // Restricted entirely to administrators.
+    match /systemLogs/{logId} {
+      allow read, write: if isOwner();
+    }
+    match /activities/{activityId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+    match /stories/{storyId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    // 11. Trades Sync
+    match /trades/{tradeId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isOwner();
+    }
+
+    // 12. Counters for sequential affiliate IDs
+    match /counters/{counterId} {
+      allow read: if true;
+      allow write: if isSignedIn() || isOwner();
+    }
+
+    // 13. Admin Permissions (Staff Management)
+    match /admins/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isOwner());
+      allow write: if isOwner();
+    }
+  }
+}

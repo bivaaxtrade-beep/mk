@@ -1,0 +1,223 @@
+{
+  "entities": {
+    "MarketCandle": {
+      "title": "Market Candle",
+      "description": "Historical price data for a market pair",
+      "type": "object",
+      "properties": {
+        "pair": { "type": "string" },
+        "type": { "type": "string" },
+        "timeframe": { "type": "string" },
+        "open": { "type": "number" },
+        "high": { "type": "number" },
+        "low": { "type": "number" },
+        "close": { "type": "number" },
+        "volume": { "type": "number" },
+        "openTime": { "type": "number" },
+        "closeTime": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["pair", "type", "timeframe", "open", "high", "low", "close", "volume", "openTime", "closeTime"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "kyc_status": { "type": "string" },
+        "isEmailVerified": { "type": "boolean" },
+        "isNidVerified": { "type": "boolean" },
+        "nidNumber": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "name": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "nickname": { "type": "string" },
+        "country": { "type": "string" },
+        "gender": { "type": "string" },
+        "dob": { "type": "object" },
+        "createdAt": { "type": "number" },
+        "hasDeposited": { "type": "boolean" },
+        "permissions": {
+          "type": "object",
+          "properties": {
+            "canManageUsers": { "type": "boolean" },
+            "canManageStaff": { "type": "boolean" },
+            "canManageFinance": { "type": "boolean" },
+            "canManageContent": { "type": "boolean" },
+            "canManageMarkets": { "type": "boolean" },
+            "canManageSystem": { "type": "boolean" },
+            "canManageDeposits": { "type": "boolean" },
+            "canManageWithdrawals": { "type": "boolean" },
+            "canManageKYC": { "type": "boolean" },
+            "canManageSupport": { "type": "boolean" }
+          }
+        },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["uid", "email"]
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "User support request",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userUid": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "subject": { "type": "string" },
+        "department": { "type": "string" },
+        "status": { "type": "string", "enum": ["Open", "Pending", "Resolved", "Escalated"] },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High", "Urgent"] },
+        "assignedAgentId": { "type": "string" },
+        "assignedAgentName": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "internalNotes": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "hiddenFromAdmin": { "type": "boolean" },
+        "dismissedByAdmin": { "type": "boolean" },
+        "dismissedAt": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "userName", "userUid", "status", "createdAt"]
+    },
+    "KnowledgeBaseArticle": {
+      "title": "Knowledge Base Article",
+      "description": "Educational or FAQ article",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["Draft", "Published"] },
+        "authorId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["title", "content", "status", "createdAt"]
+    },
+    "CannedResponse": {
+      "title": "Canned Response",
+      "description": "Predefined message template",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "text": { "type": "string" },
+        "category": { "type": "string" },
+        "shortcut": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "text", "createdAt"]
+    },
+    "SupportMessage": {
+      "title": "Support Message",
+      "description": "Message within a support ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ticketId": { "type": "string" },
+        "userId": { "type": "string" },
+        "senderType": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "ticketId", "userId", "senderType", "text", "createdAt"]
+    },
+    "KycRequest": {
+      "title": "KYC Request",
+      "description": "Identity verification request",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "status": { "type": "string" },
+        "fullName": { "type": "string" },
+        "idType": { "type": "string" },
+        "idNumber": { "type": "string" },
+        "idFrontUrl": { "type": "string" },
+        "idBackUrl": { "type": "string" },
+        "selfieUrl": { "type": "string" },
+        "submittedAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "status", "fullName", "idType", "idNumber", "idFrontUrl", "submittedAt"]
+    },
+    "PromoCode": {
+      "title": "Promo Code",
+      "description": "Deposit bonus promotional code",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "bonusPercentage": { "type": "number" },
+        "expiryDate": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "isBonusActive": { "type": "boolean" },
+        "usageCount": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["code", "bonusPercentage", "expiryDate", "isActive"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "An activity story shown on the home/trade screen carousel",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "link": { "type": "string" },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["title", "imageUrl", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/market_candles/{candleId}": {
+      "schema": "MarketCandle",
+      "description": "Market price history"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/promos/{promoId}": {
+      "schema": "PromoCode",
+      "description": "Promotional codes for deposit bonuses"
+    },
+    "/tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Support tickets"
+    },
+    "/tickets/{ticketId}/messages/{messageId}": {
+      "schema": "SupportMessage",
+      "description": "Messages for a support ticket"
+    },
+    "/knowledge_base/{articleId}": {
+      "schema": "KnowledgeBaseArticle",
+      "description": "Knowledge base articles"
+    },
+    "/canned_responses/{responseId}": {
+      "schema": "CannedResponse",
+      "description": "Predefined chat responses"
+    },
+    "/kyc_requests/{requestId}": {
+      "schema": "KycRequest",
+      "description": "KYC verification requests"
+    },
+    "/stories/{storyId}": {
+      "schema": "Story",
+      "description": "Stories shown in the activity carousel"
+    }
+  }
+}

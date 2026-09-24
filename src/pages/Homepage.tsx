@@ -1,0 +1,1553 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Menu, ArrowRight, Award, Trophy, Landmark, TrendingUp, ShieldCheck, Star, Calculator, Calendar, Smartphone, MessageCircle, BookOpen, UserPlus, FileText, Activity, Zap, Globe, Shield, Headphones, PieChart, Check, Users, HelpCircle, ChevronDown, LayoutDashboard, Image as ImageIcon, X, LogOut } from 'lucide-react';
+import { Logo } from '../components/Logo';
+import { AuthModal } from '../components/AuthModal';
+import NewsletterForm from '../components/NewsletterForm';
+import SEO from '../components/SEO';
+import { motion, AnimatePresence } from 'motion/react';
+import { auth, db, onSnapshot, doc, collection, query, where, orderBy, limit } from '../firebase';
+import { formatWithCurrency, convertToBase } from '../lib/currencies';
+import ReferralStatsCard from '../components/ReferralStatsCard';
+import { useAuth } from '../contexts/AuthContext';
+import { navigateToBlog } from '../lib/blog-navigation';
+
+// Reusable 3D Hover Gimbal Card Component with continuous floating auto-gimbal on mobile/desktop
+interface GimbalCardProps {
+  children: React.ReactNode;
+  className?: string;
+  intensity?: number;
+}
+
+function GimbalCard({ children, className = '', intensity = 12 }: GimbalCardProps) {
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [tiltStyle, setTiltStyle] = useState<React.CSSProperties>({});
+  
+  // Create a random animation delay so all cards float in organic non-sync
+  const [randomDelay] = useState(() => (Math.random() * -6).toFixed(2));
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsInteracting(true);
+    const card = cardRef.current;
+    if (!card) return;
+
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const rotateX = ((centerY - y) / centerY) * intensity;
+    const rotateY = ((x - centerX) / centerX) * intensity;
+
+    setTiltStyle({
+      transform: `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.03, 1.03, 1.03)`,
+      boxShadow: `${-rotateY * 1.5}px ${rotateX * 1.5}px 35px rgba(255, 207, 0, 0.22)`,
+      transition: 'transform 0.08s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.08s ease',
+    });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    setIsInteracting(true);
+    const card = cardRef.current;
+    if (!card) return;
+
+    const touch = e.touches[0];
+    const rect = card.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const rotateX = ((centerY - y) / centerY) * intensity * 0.8;
+    const rotateY = ((x - centerX) / centerX) * intensity * 0.8;
+
+    setTiltStyle({
+      transform: `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.03, 1.03, 1.03)`,
+      boxShadow: `${-rotateY * 1.5}px ${rotateX * 1.5}px 30px rgba(255, 207, 0, 0.22)`,
+      transition: 'transform 0.1s ease, box-shadow 0.1s ease',
+    });
+  };
+
+  const handleEnd = () => {
+    setIsInteracting(false);
+    setTiltStyle({
+      transform: 'perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)',
+      boxShadow: 'none',
+      transition: 'transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.5s ease',
+    });
+  };
+
+  const activeStyle: React.CSSProperties = isInteracting 
+    ? tiltStyle 
+    : {
+        animation: `autoGimbal 8s ease-in-out ${randomDelay}s infinite alternate`,
+        transformStyle: 'preserve-3d',
+        ...tiltStyle
+      };
+
+  return (
+    <>
+      <style>{`
+        @keyframes autoGimbal {
+          0% { transform: perspective(800px) rotateX(-2.5deg) rotateY(-3.5deg) scale(1); }
+          50% { transform: perspective(800px) rotateX(3.5deg) rotateY(2.5deg) scale(1.015); }
+          100% { transform: perspective(800px) rotateX(-2.5deg) rotateY(-3.5deg) scale(1); }
+        }
+      `}</style>
+      <div
+        ref={cardRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleEnd}
+        onTouchMove={handleTouchMove}
+        onTouchStart={() => setIsInteracting(true)}
+        onTouchEnd={handleEnd}
+        style={activeStyle}
+        className={`will-change-transform ${className}`}
+      >
+        {children}
+      </div>
+    </>
+  );
+}
+
+export default function Homepage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user: authUser } = useAuth();
+  
+  // Dynamic Scroll Parallax Tracking
+  const [scrollY, setScrollY] = useState(0);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+    const handleMouseMoveGlobal = (e: MouseEvent) => {
+      setMousePos({
+        x: (e.clientX / window.innerWidth - 0.5) * 40, // Range [-20, 20]
+        y: (e.clientY / window.innerHeight - 0.5) * 40 // Range [-20, 20]
+      });
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('mousemove', handleMouseMoveGlobal, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('mousemove', handleMouseMoveGlobal);
+    };
+  }, []);
+
+  const [authModal, setAuthModal] = useState<{isOpen: boolean, view: 'login' | 'register'}>({
+    isOpen: false,
+    view: 'login'
+  });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  const [faqSearch, setFaqSearch] = useState('');
+  const [stories, setStories] = useState<any[]>([]);
+  const [userCurrency, setUserCurrency] = useState(() => {
+    try {
+      return localStorage.getItem('user_display_currency') || 'BDT';
+    } catch (e) {
+      return 'BDT';
+    }
+  });
+
+  useEffect(() => {
+    const unsubStories = onSnapshot(query(collection(db, 'stories'), where('isActive', '==', true), orderBy('order', 'asc'), limit(5)), (snap) => {
+      const allStories = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setStories(allStories.filter((s: any) => s.title !== 'Market Overview' && s.title !== 'New Mechanics').slice(0, 3));
+    });
+    return () => unsubStories();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (user) {
+        const userSub = onSnapshot(doc(db, 'users', user.uid), (userDoc) => {
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            if (data.currency) {
+              setUserCurrency(data.currency);
+              try {
+                localStorage.setItem('user_display_currency', data.currency);
+              } catch (e) {}
+            }
+          }
+        });
+        return () => userSub();
+      }
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  const faqData = [
+    {
+      question: "What is Bivaax and how does it work?",
+      answer: "Bivaax is a modern high-performance trading platform that allows you to speculate on price movements of various assets (including major currency pairs, commodities, and synthetic indices) with high speed and payout yields up to 95%."
+    },
+    {
+      question: "What is the minimum deposit and minimum investment amount?",
+      answer: "You can start trading with a minimum deposit of only $10. The minimum investment allowed for any single trade is just $1, making our platform highly accessible for beginners as well as professional traders."
+    },
+    {
+      question: "How does the Copy Trading system work?",
+      answer: "Our built-in Copy Trading feature allows you to see profiles of expert traders, analyze their statistical win-rates, and mirror their trades automatically on your workspace in real-time."
+    },
+    {
+       question: "How secure is my account and funds with Bivaax?",
+       answer: "We employ banking-grade security mechanisms. All user accounts can enforce 2-Factor Authentication (2FA), and user balances are stored separately in modern, protected safe accounts."
+    },
+    {
+       question: "Can I try trading with virtual money first?",
+       answer: "Absolutely! Every single user receives a fully-functional Demo Account loaded with virtual currency upon free sign-up. You can practice strategies and master your skills before switching to real-money setups with a single toggle."
+    }
+  ];
+
+  const filteredFaqs = faqData.filter(faq =>
+    faq.question.toLowerCase().includes(faqSearch.toLowerCase()) ||
+    faq.answer.toLowerCase().includes(faqSearch.toLowerCase())
+  );
+
+  // Generate FAQ Schema for SEO
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqData.map(faq => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer
+      }
+    }))
+  };
+
+  useEffect(() => {
+    const refCode = searchParams.get('ref');
+    const sub = searchParams.get('sub');
+    const type = searchParams.get('type');
+    
+    if (refCode) {
+      localStorage.setItem('referralCode', refCode);
+      if (sub) localStorage.setItem('referralSub', sub);
+      if (type) localStorage.setItem('referralType', type);
+    }
+  }, [searchParams]);
+
+  return (
+    <div className="min-h-screen bg-[#1c1d22] text-white font-sans selection:bg-[#ffcf00]/30 overflow-x-hidden">
+      <SEO 
+        title="Bivaax Trade | Professional Binary Options & Forex Platform"
+        description="Experience elite trading with Bivaax Trade. The world's leading platform for binary options, forex, and digital assets. Secure instant deposits, high yields up to 95%, and 24/7 expert support. Open your free professional account today."
+        keywords="binary options broker, forex trading platform, crypto trade, Bivaax official, professional trading terminal, high yield options, secure trading app, binary trade signals, copy trading platform, best binary options broker in India, trusted binary options platform Bangladesh, top binary options broker Indonesia, forex trading platform Vietnam low deposit, online trading app with Bkash Nagad, options binarias Mexico confiable, broker forex Colombia, opções binárias Brasil Pix, bivaax login BD, binary options demo account India, binary options Pakistan, broker de forex Chile, bivaax trade login"
+        url={typeof window !== 'undefined' ? window.location.href : 'https://bivaax.com/'}
+        type="website"
+        image="https://i.postimg.cc/6p1dmLjB/IMG-20260822-005000-661.jpg"
+        faqData={faqData}
+      />
+      
+      <AuthModal 
+        isOpen={authModal.isOpen} 
+        initialView={authModal.view} 
+        onClose={() => setAuthModal({ ...authModal, isOpen: false })} 
+        onSuccess={() => navigate('/trade')} 
+      />
+
+      {/* Header */}
+      <header className="h-16 flex items-center justify-between px-3 md:px-6 sticky top-0 bg-[#1c1d22] z-50 border-b border-white/5">
+        <div className="flex items-center gap-1.5 md:gap-3">
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="text-gray-300 hover:text-white transition-colors p-1.5 -ml-1 rounded-lg hover:bg-white/5 active:scale-95 shrink-0"
+            aria-label="Open Navigation Menu"
+          >
+            <Menu size={22} />
+          </button>
+          <div className="flex items-center gap-2 cursor-pointer group select-none" onClick={() => navigate('/')}>
+            <Logo size={32} withBackground={false} />
+            <div className="flex flex-col">
+              <span className="font-black text-white text-base md:text-lg tracking-tight leading-none group-hover:text-[#ffcf00] transition-colors">Bivaax</span>
+              <span className="text-[8.5px] md:text-[9px] text-[#ffcf00] font-black uppercase tracking-[0.22em] leading-none mt-0.5">Trade</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {authUser ? (
+            <button 
+              onClick={() => navigate('/trade')}
+              className="bg-[#ffcf00] text-[#1c1d22] font-black text-sm px-4 py-2 rounded-lg hover:bg-[#e6bb00] transition-colors shadow-lg shadow-yellow-500/5 select-none flex items-center gap-2"
+            >
+              <LayoutDashboard size={16} />
+              Workspace
+            </button>
+          ) : (
+            <>
+              <button 
+                onClick={() => navigate('/login')}
+                className="text-gray-300 hover:text-white font-bold text-sm px-3.5 py-2 rounded-lg transition-colors"
+              >
+                Log In
+              </button>
+              <button 
+                onClick={() => navigate('/register')}
+                className="bg-[#ffcf00] text-[#1c1d22] font-black text-sm px-4 py-2 rounded-lg hover:bg-[#e6bb00] transition-colors shadow-lg shadow-yellow-500/5 select-none"
+              >
+                Registration
+              </button>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Slide-Over Navigation Menu Drawer */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[160]"
+            />
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "tween", duration: 0.22, ease: "easeOut" }}
+              className="fixed left-0 top-0 bottom-0 w-[300px] sm:w-[340px] bg-[#18191e] border-r border-[#2b2d35] z-[170] flex flex-col shadow-2xl overflow-hidden"
+            >
+              {/* Drawer Top Header */}
+              <div className="h-16 px-5 flex items-center justify-between border-b border-[#2b2d35]">
+                <div className="flex items-center gap-2.5">
+                  <Logo size={26} withBackground={false} />
+                  <span className="font-black text-white text-base tracking-wider uppercase">BIVAAX TRADE</span>
+                </div>
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-gray-400 hover:text-white transition-colors p-2 rounded-lg hover:bg-[#252730]"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Drawer Main Body */}
+              <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6 custom-scrollbar">
+                
+                {/* User Card / Quick Authentication Action */}
+                <div className="bg-[#21232a] border border-[#2d303a] rounded-xl p-4 shadow-sm">
+                  {authUser ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#ffcf00]/20 border border-[#ffcf00]/40 flex items-center justify-center text-[#ffcf00] font-black text-base">
+                          {authUser.email?.[0].toUpperCase() || 'U'}
+                        </div>
+                        <div className="overflow-hidden">
+                          <p className="text-white font-bold text-sm truncate">{authUser.displayName || 'Trader'}</p>
+                          <p className="text-gray-400 text-xs truncate">{authUser.email}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => { setIsMobileMenuOpen(false); navigate('/trade'); }}
+                        className="w-full bg-[#ffcf00] text-[#1c1d22] font-black py-2.5 rounded-lg text-sm hover:bg-[#e6bb00] transition-colors flex items-center justify-center gap-2"
+                      >
+                        <LayoutDashboard size={16} />
+                        Go to Workspace
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      <p className="text-[11px] font-black text-gray-400 uppercase tracking-wider mb-2">Member Portal</p>
+                      <button
+                        onClick={() => { setIsMobileMenuOpen(false); navigate('/login'); }}
+                        className="w-full bg-[#2a2c35] hover:bg-[#323540] text-white font-bold py-2.5 rounded-lg text-sm border border-[#3a3d4a] transition-colors"
+                      >
+                        Log In
+                      </button>
+                      <button
+                        onClick={() => { setIsMobileMenuOpen(false); navigate('/register'); }}
+                        className="w-full bg-[#ffcf00] hover:bg-[#e6bb00] text-[#1c1d22] font-black py-2.5 rounded-lg text-sm shadow-md transition-colors"
+                      >
+                        Create Free Account
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Navigation Sections - Clean Typography */}
+                <div className="space-y-1">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2">Navigation</p>
+
+                  <Link
+                    to="/trade"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-2.5 px-3 rounded-lg text-gray-200 hover:text-white hover:bg-[#23252d] text-sm font-medium transition-colors"
+                  >
+                    <span>Trade Terminal</span>
+                    <span className="text-[10px] font-bold text-[#ffcf00] uppercase tracking-wider">Live</span>
+                  </Link>
+
+                  <Link
+                    to="/tournaments"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-2.5 px-3 rounded-lg text-gray-200 hover:text-white hover:bg-[#23252d] text-sm font-medium transition-colors"
+                  >
+                    <span>Tournaments</span>
+                  </Link>
+
+                  <Link
+                    to="/copy-trading"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-2.5 px-3 rounded-lg text-gray-200 hover:text-white hover:bg-[#23252d] text-sm font-medium transition-colors"
+                  >
+                    <span>Copy Trading</span>
+                  </Link>
+
+                  <Link
+                    to="/affiliate"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-2.5 px-3 rounded-lg text-gray-200 hover:text-white hover:bg-[#23252d] text-sm font-medium transition-colors"
+                  >
+                    <span>Affiliate Program</span>
+                  </Link>
+
+                  <Link
+                    to="/insights"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-2.5 px-3 rounded-lg text-gray-200 hover:text-white hover:bg-[#23252d] text-sm font-medium transition-colors"
+                  >
+                    <span>Market Insights</span>
+                  </Link>
+
+                  <Link
+                    to="/blog"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-2.5 px-3 rounded-lg text-gray-200 hover:text-white hover:bg-[#23252d] text-sm font-medium transition-colors"
+                  >
+                    <span>Trading Academy</span>
+                  </Link>
+
+                  <Link
+                    to="/support"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-2.5 px-3 rounded-lg text-gray-200 hover:text-white hover:bg-[#23252d] text-sm font-medium transition-colors"
+                  >
+                    <span>Client Support</span>
+                  </Link>
+                </div>
+
+                {/* Information & Regulatory Details */}
+                <div className="pt-4 border-t border-[#2b2d35] space-y-2">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-2">Information</p>
+                  
+                  <div className="space-y-1.5 text-xs text-gray-400 px-2 leading-relaxed">
+                    <p className="text-gray-300 font-semibold">Bivaax Trade Platform</p>
+                    <p>Institutional execution engine for global financial markets, synthetic indices, and currency pairs.</p>
+                  </div>
+                </div>
+
+                {/* Footer Info */}
+                <div className="pt-4 border-t border-[#2b2d35] px-2 flex items-center justify-between text-xs text-gray-500">
+                  <span>© 2026 Bivaax Trade</span>
+                  <span className="font-mono text-[10px]">v2.4 Enterprise</span>
+                </div>
+
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+      
+
+      {/* Hero Section */}
+      <section className="px-4 pt-12 pb-24 relative overflow-hidden">
+        {/* Background Video & Ken Burns Image Animation Overlay */}
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <motion.div
+            initial={{ scale: 1.2, x: '-5%', y: '-5%' }}
+            animate={{ scale: 1, x: '0%', y: '0%' }}
+            transition={{
+              duration: 30,
+              repeat: Infinity,
+              repeatType: "reverse",
+              ease: "linear"
+            }}
+            className="absolute inset-0"
+          >
+            <img 
+              src="https://images.unsplash.com/photo-1611974717484-24539ef3688b?auto=format&fit=crop&q=80&w=2070" 
+              className="absolute min-w-full min-h-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 object-cover opacity-40 blur-[1px]"
+              alt="Trading Background"
+            />
+          </motion.div>
+          <video 
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            className="absolute min-w-full min-h-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 object-cover opacity-20 blur-[2px] pointer-events-none scale-110"
+          >
+            <source src="https://assets.mixkit.co/videos/preview/mixkit-trading-graphs-on-a-monitor-34533-large.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-[#1c1d22]/80 backdrop-blur-[1px]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1c1d22]/50 to-[#1c1d22]" />
+        </div>
+
+        {/* Glowing Golden Network / Connecting Curves (lines) as requested by user - Gimbal Controlled */}
+        <svg 
+          className="absolute inset-0 w-full h-full opacity-65 pointer-events-none z-0 transition-transform duration-500 ease-out" 
+          style={{
+            transform: `translate3d(${mousePos.x * 0.4}px, ${mousePos.y * 0.4}px, 0) scale(1.05)`,
+          }}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ffcf00" stopOpacity="0.9" />
+              <stop offset="50%" stopColor="#ffae00" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="#ffcf00" stopOpacity="0.2" />
+            </linearGradient>
+          </defs>
+          <path d="M 100 100 Q 350 250 600 120 T 1100 180" fill="none" stroke="url(#goldGrad)" strokeWidth="1.5" strokeDasharray="4 4" />
+          <path d="M 80 50 Q 500 350 900 120" fill="none" stroke="url(#goldGrad)" strokeWidth="1.2" />
+          <path d="M 150 220 Q 400 480 650 380 T 1150 450" fill="none" stroke="url(#goldGrad)" strokeWidth="1.5" />
+          <path d="M 250 60 Q 550 550 850 80" fill="none" stroke="url(#goldGrad)" strokeWidth="1" strokeDasharray="6 6" />
+          <path d="M 180 320 Q 520 650 920 380" fill="none" stroke="url(#goldGrad)" strokeWidth="1.5" />
+          
+          {/* Beautiful extra yellow curves to fill the right side (where user requested in the red box) */}
+          <path d="M 600 150 Q 850 350 1100 200 T 1500 400" fill="none" stroke="url(#goldGrad)" strokeWidth="1.6" strokeDasharray="5 5" />
+          <path d="M 750 250 Q 980 500 1200 320" fill="none" stroke="url(#goldGrad)" strokeWidth="1.3" />
+          <path d="M 550 380 Q 800 620 1050 480 T 1400 650" fill="none" stroke="url(#goldGrad)" strokeWidth="1.5" />
+          <path d="M 680 80 Q 900 480 1180 120" fill="none" stroke="url(#goldGrad)" strokeWidth="1.1" strokeDasharray="8 8" />
+          
+          <circle cx="280" cy="190" r="3.5" fill="#ffcf00" opacity="0.8" />
+          <circle cx="720" cy="280" r="4" fill="#ffcf00" opacity="0.9" />
+          <circle cx="520" cy="420" r="3" fill="#ffcf00" opacity="0.7" />
+          <circle cx="850" cy="200" r="3.5" fill="#ffcf00" opacity="0.8" />
+          
+          {/* Extra pulsing glow circles in the right region */}
+          <circle cx="950" cy="280" r="4" fill="#ffcf00" opacity="0.95" />
+          <circle cx="1120" cy="380" r="3" fill="#ffcf00" opacity="0.8" />
+          <circle cx="1060" cy="210" r="3.5" fill="#ffcf00" opacity="0.9" />
+          <circle cx="1280" cy="450" r="4" fill="#ffcf00" opacity="0.85" />
+        </svg>
+
+        <div className="max-w-6xl mx-auto text-center relative z-10 text-white">
+          <div className="max-w-3xl mx-auto">
+            <motion.h1 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4, duration: 0.8 }}
+              className="text-5xl md:text-8xl font-black mb-8 tracking-tighter leading-[0.95] uppercase"
+            >
+              Master the <br/><span className="text-[#ffcf00]">Global Markets</span>
+            </motion.h1>
+            <motion.p 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.8 }}
+              className="text-gray-400 text-lg md:text-2xl mb-12 leading-relaxed font-medium max-w-2xl mx-auto"
+            >
+              Experience a institutional-grade trading environment. Bivaax offers professional tools, ultra-low latency, and reliable execution for serious traders.
+            </motion.p>
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.6, duration: 0.8 }}
+              className="flex justify-center gap-4"
+            >
+              {authUser ? (
+                <button 
+                  onClick={() => navigate('/trade')}
+                  className="bg-[#ffcf00] hover:bg-[#e6bb00] text-[#1c1d22] font-black text-lg px-10 py-5 rounded-2xl transition-all shadow-xl shadow-yellow-500/20 active:scale-95 flex items-center gap-2"
+                >
+                  <LayoutDashboard size={20} />
+                  Go to Trading Terminal
+                </button>
+              ) : (
+                <button 
+                  onClick={() => navigate('/register')}
+                  className="bg-[#ffcf00] hover:bg-[#e6bb00] text-[#1c1d22] font-black text-lg px-10 py-5 rounded-2xl transition-all shadow-xl shadow-yellow-500/20 active:scale-95"
+                >
+                  Start Trading Now
+                </button>
+              )}
+            </motion.div>
+
+            {/* Referral Stats Card for Logged In Users */}
+            {authUser && (
+              <div className="mt-12 max-w-lg mx-auto">
+                <ReferralStatsCard />
+              </div>
+            )}
+          </div>
+          
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+            className="mt-8 flex items-center justify-center gap-6"
+          >
+            <div className="flex items-center gap-2 text-[#ffcf00] font-bold text-sm bg-white/5 px-4 py-2 rounded-full border border-[#ffcf00]/20">
+              <TrendingUp size={16} />
+              Min Entry: $1
+            </div>
+            <div className="flex items-center gap-2 text-green-500 font-bold text-sm bg-white/5 px-4 py-2 rounded-full border border-green-500/20">
+              <ShieldCheck size={16} />
+              Regulated & Secure
+            </div>
+          </motion.div>
+
+          {/* Removed Market Tickers per user request */}
+
+          {/* Removed Market Status and Market Movers section per user request */}
+
+          {/* Payment & Security Partners */}
+          <div className="mt-14 pt-8 border-t border-white/5 flex flex-col items-center">
+            <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-6">Trusted payments & security</p>
+            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-14 opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-500">
+              {/* Visa */}
+              <div className="text-2xl font-black italic tracking-tighter text-blue-100 hover:text-blue-500 transition-colors">VISA</div>
+              {/* Mastercard */}
+              <div className="flex items-center relative">
+                <div className="w-7 h-7 rounded-full bg-red-500 opacity-90 mix-blend-screen" />
+                <div className="w-7 h-7 rounded-full bg-yellow-500 opacity-90 mix-blend-screen -ml-3" />
+                <span className="ml-2 font-bold text-sm text-gray-300">mastercard</span>
+              </div>
+              {/* Bitcoin */}
+              <div className="flex items-center gap-1.5 text-gray-300 font-bold text-lg hover:text-[#F7931A] transition-colors">
+                <span className="text-xl">₿</span>
+                Bitcoin
+              </div>
+              {/* Ethereum */}
+              <div className="flex items-center gap-1.5 text-gray-300 font-bold hover:text-[#627EEA] transition-colors">
+                <div className="w-4 h-6 border-[2px] border-current rounded-[3px] flex items-center justify-center">
+                  <div className="w-0.5 h-3 bg-current" />
+                </div>
+                Ethereum
+              </div>
+              {/* PCI DSS */}
+              <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-gray-300 border border-gray-600 px-3 py-1.5 rounded bg-black/20 hover:border-green-500 hover:text-green-400 transition-colors">
+                <ShieldCheck size={14} className="text-current" />
+                PCI DSS Secure
+              </div>
+            </div>
+          </div>
+
+          {/* Awards List - Premium Hover Gimbal Cards */}
+          <div className="mt-20 grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
+            {[
+              { icon: Award, title: "IAIR Awards" },
+              { icon: Trophy, title: "FE Awards" },
+              { icon: Landmark, title: "Financial Commission" },
+              { icon: TrendingUp, title: "Market Data" },
+              { icon: ShieldCheck, title: "Secure Platform" }
+            ].map((award, i) => (
+              <GimbalCard 
+                key={`award-${award.title}`} 
+                intensity={15}
+                className="flex flex-col items-center gap-3 p-4 rounded-3xl bg-[#22232a]/30 border border-white/5 shadow-md hover:border-[#ffcf00]/30 transition-colors"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-[#ffcf00] shadow-lg border border-white/5">
+                  <award.icon size={28} />
+                </div>
+                <div className="font-bold text-sm tracking-tight text-gray-300">{award.title}</div>
+              </GimbalCard>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="px-4 py-24 bg-[#1a1b20] relative overflow-hidden">
+        {/* Glowing Golden Network / Connecting Curves (lines) - Gimbal Controlled */}
+        <svg 
+          className="absolute inset-0 w-full h-full opacity-45 pointer-events-none z-0 transition-transform duration-500 ease-out" 
+          style={{
+            transform: `translate3d(${-mousePos.x * 0.3}px, ${-mousePos.y * 0.3}px, 0) scale(1.05)`,
+          }}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <linearGradient id="goldGradFeatures" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ffcf00" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#ffae00" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#ffcf00" stopOpacity="0.12" />
+            </linearGradient>
+          </defs>
+          <path d="M -50 200 Q 250 50 600 300 T 1200 100" fill="none" stroke="url(#goldGradFeatures)" strokeWidth="1.3" strokeDasharray="3 3" />
+          <path d="M 100 400 Q 500 150 900 450" fill="none" stroke="url(#goldGradFeatures)" strokeWidth="1.6" />
+          <path d="M 200 100 Q 600 500 1000 200 T 1400 400" fill="none" stroke="url(#goldGradFeatures)" strokeWidth="1.1" />
+          
+          <circle cx="350" cy="180" r="3" fill="#ffcf00" opacity="0.6" />
+          <circle cx="850" cy="320" r="3.5" fill="#ffcf00" opacity="0.75" />
+          <circle cx="600" cy="220" r="2.5" fill="#ffcf00" opacity="0.5" />
+          <circle cx="1100" cy="250" r="3.5" fill="#ffcf00" opacity="0.7" />
+        </svg>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 50 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          className="max-w-6xl mx-auto relative z-10"
+        >
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-6xl font-black mb-4 tracking-tighter uppercase">Elite <span className="text-[#ffcf00]">Infrastructure</span></h2>
+            <p className="text-gray-500 max-w-2xl mx-auto text-lg">Harness the power of institutional-grade trading technology designed for peak performance and absolute reliability.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { icon: Activity, title: "Technical Indicators", desc: "Access 20+ professional indicators including RSI, MACD, and Bollinger Bands." },
+              { icon: Zap, title: "Instant Execution", desc: "Execute trades in milliseconds with our high-frequency trading infrastructure." },
+              { icon: Globe, title: "Global Markets", desc: "Trade major currency pairs, commodities, and the exclusive Crypto IDX." },
+              { icon: Shield, title: "Asset Protection", desc: "Your funds are protected by multi-layer security protocols and encryption." },
+              { icon: Headphones, title: "24/7 Priority Support", desc: "Our expert team is available around the clock to assist with your needs." },
+              { icon: PieChart, title: "Advanced Analytics", desc: "Track your performance with detailed history and profit analytics." }
+            ].map((f, i) => (
+              <motion.div
+                key={`feature-motion-${f.title}`}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+              >
+                <GimbalCard 
+                  intensity={14}
+                  className="bg-[#22232a] p-8 rounded-[32px] border border-white/5 hover:border-[#ffcf00]/20 transition-all h-full group"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-[#ffcf00] mb-6 group-hover:scale-110 transition-transform">
+                    <f.icon size={28} />
+                  </div>
+                  <h3 className="font-bold text-xl mb-3">{f.title}</h3>
+                  <p className="text-gray-500 leading-relaxed text-sm">{f.desc}</p>
+                </GimbalCard>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      </section>
+
+          {/* Removed Copy Trading Highlights per user request */}
+
+      {/* Why Choose Bivaax Section */}
+      <section className="px-4 py-24 border-t border-white/5 relative overflow-hidden">
+        {/* Glowing Golden Network / Connecting Curves (lines) */}
+        <svg className="absolute inset-0 w-full h-full opacity-45 pointer-events-none z-0" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="goldGradElite" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ffcf00" stopOpacity="0.85" />
+              <stop offset="50%" stopColor="#ffae00" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#ffcf00" stopOpacity="0.1" />
+            </linearGradient>
+          </defs>
+          <path d="M 100 100 Q 400 400 800 200 T 1300 350" fill="none" stroke="url(#goldGradElite)" strokeWidth="1.5" />
+          <path d="M 0 300 Q 500 50 900 380" fill="none" stroke="url(#goldGradElite)" strokeWidth="1.2" strokeDasharray="4 4" />
+          
+          <circle cx="450" cy="250" r="3" fill="#ffcf00" opacity="0.6" />
+          <circle cx="950" cy="180" r="3.5" fill="#ffcf00" opacity="0.8" />
+          <circle cx="720" cy="310" r="2.5" fill="#ffcf00" opacity="0.5" />
+        </svg>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 50 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          className="max-w-6xl mx-auto relative z-10"
+        >
+          <div className="flex flex-col lg:flex-row items-center gap-20">
+             <div className="flex-1 space-y-8">
+                <h2 className="text-4xl md:text-6xl font-black tracking-tighter leading-tight">Ready to join the <span className="text-[#ffcf00]">elite?</span></h2>
+                <p className="text-gray-400 text-lg leading-relaxed">
+                   Join thousands of traders who have already chosen Bivaax as their primary partner. Our Commitment is to provide the most stable environment for your growth.
+                </p>
+                <div className="space-y-4">
+                  {[
+                    "Over 1,000,000 active users globally",
+                    "Regulated by International Financial Commission",
+                    "Advanced Copy Trading system for beginners",
+                    "Highest profit percentages in the market (up to 95%)",
+                    "Instant withdrawals to mobile wallets"
+                  ].map((item, idx) => (
+                    <div key={`benefit-item-${idx}`} className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center text-green-500">
+                        <Check size={14} strokeWidth={3} />
+                      </div>
+                      <span className="font-bold text-gray-300">{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  onClick={() => navigate('/register')}
+                  className="bg-white text-black font-bold px-8 py-4 rounded-xl hover:bg-gray-200 transition-colors flex items-center gap-2"
+                >
+                  Create Free Account <ArrowRight size={20} />
+                </button>
+             </div>
+             <motion.div 
+               initial={{ opacity: 0, x: 50 }}
+               whileInView={{ opacity: 1, x: 0 }}
+               viewport={{ once: true }}
+               transition={{ duration: 0.8 }}
+               className="flex-1 relative"
+             >
+                <div className="absolute inset-0 bg-[#ffcf00]/20 blur-[100px] rounded-full" />
+                <GimbalCard intensity={16} className="bg-[#22232a] border border-white/10 rounded-[40px] p-8 relative z-10 shadow-2xl">
+                   <div className="flex items-center justify-between mb-10">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#ffcf00]/10 flex items-center justify-center text-[#ffcf00]">
+                          <Trophy size={20} />
+                        </div>
+                        <span className="font-black tracking-widest text-[10px] uppercase text-gray-500">Top Performance</span>
+                      </div>
+                      <div className="text-green-500 font-black">+95.2%</div>
+                   </div>
+                   <div className="space-y-6">
+                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          whileInView={{ width: "85%" }}
+                          transition={{ duration: 1.5, delay: 0.5 }}
+                          className="h-full bg-[#ffcf00] shadow-[0_0_15px_rgba(255,207,0,0.5)]" 
+                        />
+                      </div>
+                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          whileInView={{ width: "65%" }}
+                          transition={{ duration: 1.5, delay: 0.7 }}
+                          className="h-full bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]" 
+                        />
+                      </div>
+                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          whileInView={{ width: "92%" }}
+                          transition={{ duration: 1.5, delay: 0.9 }}
+                          className="h-full bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]" 
+                        />
+                      </div>
+                   </div>
+                   <div className="mt-12 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1">Weekly Profit</p>
+                        <p className="text-3xl font-black text-white tracking-tighter">{formatWithCurrency(convertToBase(1245600, 'BDT'), userCurrency)}</p>
+                      </div>
+                      <TrendingUp size={48} className="text-[#ffcf00] opacity-20" />
+                   </div>
+                </GimbalCard>
+             </motion.div>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* Footer */}
+      {/* All sections here */}
+      <section className="bg-white text-black py-20 px-4 text-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          className="max-w-xl mx-auto"
+        >
+          <h2 className="text-3xl md:text-4xl font-extrabold mb-8">The highest profitability on the market</h2>
+          
+          <div className="relative inline-block mb-8">
+            <h3 className="text-[120px] md:text-[160px] font-black text-[#ffcf00] leading-none drop-shadow-xl" style={{ textShadow: '2px 4px 10px rgba(0,0,0,0.1)' }}>
+              99<span className="text-[70px] md:text-[100px] text-[#2c2d32]">%</span>
+            </h3>
+            <div className="absolute bottom-4 -right-4 bg-white border-2 border-gray-100 shadow-xl px-4 py-1 rounded-sm rotate-[-5deg]">
+              <span className="font-bold text-xl tracking-wider text-[#2c2d32]">PROFIT</span>
+            </div>
+          </div>
+
+          <p className="text-gray-500 text-lg md:text-xl font-medium mb-10 max-w-sm mx-auto leading-relaxed">
+            Available only on Bivaax with Dynamic Range Trading (DRT) for VIP users
+          </p>
+
+          <button 
+            onClick={() => navigate('/register')}
+            className="w-full sm:w-auto bg-[#ffcf00] hover:bg-[#e6bb00] text-[#1c1d22] font-bold text-xl px-12 py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-3 mx-auto active:scale-95"
+          >
+            Join us <ArrowRight size={24} />
+          </button>
+        </motion.div>
+      </section>
+
+      {/* Referral Program */}
+      <section className="bg-[#1c1d22] py-20 px-4 relative overflow-hidden">
+        {/* Glowing Golden Network / Connecting Curves (lines) */}
+        <svg className="absolute inset-0 w-full h-full opacity-30 pointer-events-none z-0" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="goldGradReferral" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ffcf00" stopOpacity="0.75" />
+              <stop offset="50%" stopColor="#ffae00" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#ffcf00" stopOpacity="0.1" />
+            </linearGradient>
+          </defs>
+          <path d="M -50 150 Q 200 350 500 100 T 1100 250" fill="none" stroke="url(#goldGradReferral)" strokeWidth="1.2" strokeDasharray="5 5" />
+          <path d="M 100 50 Q 400 200 800 50" fill="none" stroke="url(#goldGradReferral)" strokeWidth="1" />
+          
+          <circle cx="300" cy="150" r="3.5" fill="#ffcf00" opacity="0.6" />
+          <circle cx="750" cy="80" r="2.5" fill="#ffcf00" opacity="0.5" />
+        </svg>
+
+        <div className="max-w-md mx-auto bg-[#2c2d32] rounded-3xl overflow-hidden shadow-2xl relative z-10">
+          <div className="h-48 bg-gradient-to-br from-green-500/20 to-[#ffcf00]/20 flex items-center justify-center relative overflow-hidden">
+            <UserPlus size={100} className="text-white/20 absolute -right-6 -bottom-6" />
+            <TrendingUp size={80} className="text-[#ffcf00] z-10" />
+          </div>
+          <div className="p-8">
+            <span className="text-[#ffcf00] font-medium text-sm">Bivaax referral program</span>
+            <h2 className="text-2xl font-bold mt-3 mb-8">Invite friends and get up to $100 to your real account</h2>
+            <button className="w-full bg-[#ffcf00] hover:bg-[#e6bb00] text-black font-bold text-lg py-4 rounded-xl transition-colors">
+              Learn more
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Statistics Section */}
+      <section className="bg-white py-24 px-4 text-black text-center relative overflow-hidden">
+        <div className="max-w-md mx-auto space-y-16">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="text-5xl md:text-6xl font-black mb-2 tracking-tighter">983 104</div>
+            <div className="text-gray-500 font-bold uppercase tracking-wider text-xs">Active traders daily</div>
+          </motion.div>
+          
+          <motion.div 
+            initial={{ width: 0 }}
+            whileInView={{ width: 64 }}
+            viewport={{ once: true }}
+            className="h-1 bg-[#ffcf00] mx-auto rounded-full"
+          ></motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <div className="text-5xl md:text-6xl font-black mb-2 tracking-tighter">133</div>
+            <div className="text-gray-500 font-bold uppercase tracking-wider text-xs">Countries of presence</div>
+          </motion.div>
+
+          <motion.div 
+            initial={{ width: 0 }}
+            whileInView={{ width: 64 }}
+            viewport={{ once: true }}
+            className="h-1 bg-[#ffcf00] mx-auto rounded-full"
+          ></motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            <div className="text-5xl md:text-6xl font-black mb-2 tracking-tighter">29 974 955</div>
+            <div className="text-gray-500 font-bold uppercase tracking-wider text-xs">Successful trades in the past week</div>
+          </motion.div>
+
+          <div className="w-16 h-1 bg-[#ffcf00] mx-auto rounded-full"></div>
+
+          <div>
+            <div className="text-5xl font-black mb-3">4.8 <span className="text-xl font-medium text-gray-500">out of 5</span></div>
+            <div className="flex items-center justify-center gap-1 text-[#ffcf00] mb-2">
+              <Star fill="currentColor" size={28} />
+              <Star fill="currentColor" size={28} />
+              <Star fill="currentColor" size={28} />
+              <Star fill="currentColor" size={28} />
+              <Star fill="currentColor" size={28} opacity={0.5} />
+            </div>
+            <div className="font-bold text-indigo-600 text-xl tracking-tight">hellopeter</div>
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits Section */}
+      <section className="bg-white pb-24 px-4 text-black text-center relative overflow-hidden">
+        <motion.h2 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-3xl md:text-5xl font-black mb-20 tracking-tighter uppercase"
+        >
+          The benefits of the platform
+        </motion.h2>
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative">
+          
+          {/* Benefit 1 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            <GimbalCard
+              intensity={12}
+              className="flex flex-col items-center p-8 rounded-[32px] bg-gray-50/50 hover:bg-gray-50 border border-gray-100 transition-all h-full text-center"
+            >
+              <div className="w-20 h-20 mb-6 flex justify-center items-center">
+                <Calculator size={70} strokeWidth={1} className="text-[#ffcf00]" />
+              </div>
+              <h3 className="text-xl font-black mb-4 uppercase tracking-tighter leading-tight">Minimum account balance from $10</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">Start making trades with minimum investments and grow your capital steadily.</p>
+            </GimbalCard>
+          </motion.div>
+          
+          {/* Benefit 2 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <GimbalCard
+              intensity={12}
+              className="flex flex-col items-center p-8 rounded-[32px] bg-gray-50/50 hover:bg-gray-50 border border-gray-100 transition-all h-full text-center"
+            >
+              <div className="w-20 h-20 mb-6 flex justify-center items-center">
+                <ShieldCheck size={70} strokeWidth={1} className="text-[#ffcf00]" />
+              </div>
+              <h3 className="text-xl font-black mb-4 uppercase tracking-tighter leading-tight">Trade amount starting from $1</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">The minimum cost of a trade is quite low. Master the markets without heavy initial risks.</p>
+            </GimbalCard>
+          </motion.div>
+          
+          {/* Benefit 3 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <GimbalCard
+              intensity={12}
+              className="flex flex-col items-center p-8 rounded-[32px] bg-gray-50/50 hover:bg-gray-50 border border-gray-100 transition-all h-full text-center"
+            >
+              <div className="w-20 h-20 mb-6 flex justify-center items-center">
+                <div className="flex items-end h-full gap-1">
+                  <motion.div 
+                    initial={{ height: 0 }}
+                    whileInView={{ height: 48 }}
+                    transition={{ duration: 1, delay: 0.5 }}
+                    className="w-1.5 bg-[#ffcf00] mb-1"
+                  ></motion.div>
+                  <motion.div 
+                    initial={{ height: 0 }}
+                    whileInView={{ height: 64 }}
+                    transition={{ duration: 1, delay: 0.7 }}
+                    className="w-1.5 bg-[#ffcf00] mb-1"
+                  ></motion.div>
+                  <motion.div 
+                    initial={{ height: 0 }}
+                    whileInView={{ height: 32 }}
+                    transition={{ duration: 1, delay: 0.9 }}
+                    className="w-1.5 bg-[#ffcf00] mb-1"
+                  ></motion.div>
+                  <motion.div 
+                    initial={{ height: 0 }}
+                    whileInView={{ height: 56 }}
+                    transition={{ duration: 1, delay: 1.1 }}
+                    className="w-1.5 bg-[#ffcf00] mb-1"
+                  ></motion.div>
+                  <motion.div 
+                    initial={{ height: 0 }}
+                    whileInView={{ height: 80 }}
+                    transition={{ duration: 1, delay: 1.3 }}
+                    className="w-1.5 bg-[#ffcf00] mb-1"
+                  ></motion.div>
+                </div>
+              </div>
+              <h3 className="text-xl font-black mb-4 uppercase tracking-tighter leading-tight">A unique mode of trading: 'Non-stop'</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">No restrictions on concurrent trades. Open several positions simultaneously and maximize your reach.</p>
+            </GimbalCard>
+          </motion.div>
+          
+          {/* Benefit 4 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <GimbalCard
+              intensity={12}
+              className="flex flex-col items-center p-8 rounded-[32px] bg-gray-50/50 hover:bg-gray-50 border border-gray-100 transition-all h-full text-center"
+            >
+              <div className="w-20 h-20 mb-6 flex justify-center items-center">
+                <Calendar size={70} strokeWidth={1} className="text-[#ffcf00]" />
+              </div>
+              <h3 className="text-xl font-black mb-4 uppercase tracking-tighter leading-tight">Work also on the weekends</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">Various OTC options available for your convenience: trade even on weekends choosing the most suitable assets.</p>
+            </GimbalCard>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Transparent Deposit Section */}
+      <section className="bg-gray-100/50 py-20 px-4 text-black">
+        <div className="max-w-md mx-auto">
+          <h2 className="text-3xl font-extrabold mb-6 text-center">Transparent deposit, fast withdrawal</h2>
+          <p className="text-center text-gray-700 mb-8 font-medium">Transfers safely via familiar payment methods</p>
+          
+          <div className="space-y-4 mb-10">
+             {[
+                { icon: Smartphone, name: "E-wallets" },
+                { icon: TrendingUp, name: "Crypto methods" }
+             ].map((method, i) => (
+                <div key={`pay-method-${method.name}`} className="bg-white rounded-2xl p-6 flex items-center shadow-sm">
+                  <method.icon size={32} className="text-[#ffcf00] mr-6" strokeWidth={1.5} />
+                  <span className="font-bold text-[17px]">{method.name}</span>
+                </div>
+             ))}
+          </div>
+
+          <button 
+            onClick={() => navigate('/register')}
+            className="w-full bg-[#ffcf00] hover:bg-[#e6bb00] text-black font-bold text-xl py-5 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition-colors"
+          >
+            Try Bivaax <ArrowRight size={24} />
+          </button>
+        </div>
+      </section>
+
+      {/* Trade From Anywhere */}
+      <section className="bg-white py-20 px-4 text-black text-center">
+        <div className="max-w-md mx-auto">
+          <h2 className="text-3xl font-extrabold mb-4">Trade<br/>from anywhere!</h2>
+          <p className="text-gray-600 mb-12">
+            You can trade anytime and anywhere with the Bivaax app for iOS and Android. Stay in the know: instant information on trade closings, promotions and tournaments.
+          </p>
+          
+          <div className="space-y-4 max-w-[280px] mx-auto">
+            {/* Fake App Store Button */}
+            <div className="bg-black text-white rounded-xl py-3 px-6 flex items-center cursor-pointer hover:bg-gray-900 transition-colors">
+               <div className="text-3xl mr-4 px-1">🍏</div>
+               <div className="text-left flex-1">
+                 <div className="text-[10px] text-gray-300">Download on the</div>
+                 <div className="text-xl font-semibold leading-none">App Store</div>
+               </div>
+            </div>
+            
+             {/* Fake GP Button */}
+             <div className="bg-black text-white rounded-xl py-3 px-6 flex items-center cursor-pointer hover:bg-gray-900 transition-colors">
+               <div className="text-3xl mr-4 px-1">▶</div>
+               <div className="text-left flex-1">
+                 <div className="text-[10px] text-gray-300">GET IT ON</div>
+                 <div className="text-xl font-semibold leading-none">Google Play</div>
+               </div>
+            </div>
+            
+             <div className="bg-black text-white rounded-xl py-3 px-6 flex items-center cursor-pointer hover:bg-gray-900 transition-colors justify-center font-bold">
+               <span className="text-blue-400 mr-2 text-xl">🚀</span> TG Mini App
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Simple and Convenient */}
+      <section className="bg-white py-20 px-4 text-black border-t border-gray-100">
+        <div className="max-w-md mx-auto text-center space-y-12">
+          <h2 className="text-3xl font-extrabold mb-8">Simple and convenient</h2>
+          
+          <GimbalCard 
+            intensity={10}
+            className="bg-gray-50/50 hover:bg-gray-50 border border-gray-100 p-8 rounded-[32px] transition-all"
+          >
+            <div className="w-24 h-24 bg-[#ffcf00] rounded-full mx-auto flex items-center justify-center mb-6 shadow-xl shadow-yellow-500/20">
+               <Award size={40} className="text-black" />
+            </div>
+            <h3 className="text-2xl font-bold mb-4">Demo account</h3>
+            <p className="text-gray-600 font-medium">You can always improve your trading skills on the demo account. When you're ready, switch to your real account.</p>
+          </GimbalCard>
+
+          <GimbalCard 
+            intensity={10}
+            className="bg-gray-50/50 hover:bg-gray-50 border border-gray-100 p-8 rounded-[32px] transition-all"
+          >
+            <div className="w-24 h-24 bg-[#ffcf00] rounded-full mx-auto flex items-center justify-center mb-6 shadow-xl shadow-yellow-500/20">
+               <MessageCircle size={40} className="text-black" />
+            </div>
+            <h3 className="text-2xl font-bold mb-4">Online support</h3>
+            <p className="text-gray-600 font-medium">You can send a message anytime via chat and get feedback right away!</p>
+          </GimbalCard>
+
+          <GimbalCard 
+            intensity={10}
+            className="bg-gray-50/50 hover:bg-gray-50 border border-gray-100 p-8 rounded-[32px] transition-all"
+          >
+            <div className="w-24 h-24 bg-[#ffcf00] rounded-full mx-auto flex items-center justify-center mb-6 shadow-xl shadow-yellow-500/20">
+               <BookOpen size={40} className="text-black" />
+            </div>
+            <h3 className="text-2xl font-bold mb-4">Free training</h3>
+            <p className="text-gray-600 font-medium">By studying the extensive knowledge base, you will be able to improve your trading skills for better results.</p>
+          </GimbalCard>
+
+          <GimbalCard 
+            intensity={10}
+            className="bg-gray-50/50 hover:bg-gray-50 border border-gray-100 p-8 rounded-[32px] transition-all"
+          >
+            <div className="w-24 h-24 bg-[#ffcf00] rounded-full mx-auto flex items-center justify-center mb-6 shadow-xl shadow-yellow-500/20">
+               <Users size={40} className="text-black" />
+            </div>
+            <h3 className="text-2xl font-bold mb-4">Copy trading</h3>
+            <p className="text-gray-600 font-medium">Follow professional traders and copy their trades automatically. It's the best way to earn while you learn.</p>
+          </GimbalCard>
+        </div>
+      </section>
+
+      <section className="bg-gray-50 py-20 px-4 text-black text-center">
+         <div className="max-w-md mx-auto">
+            <h2 className="text-3xl font-extrabold mb-4">Put your trading<br/>helmet on</h2>
+            <p className="text-gray-600 mb-12">
+              Trading on Bivaax is an exciting process. But to really enjoy it, you need to keep yourself safe. Use Bivaax features that protect your accounts and funds:
+            </p>
+
+            <div className="space-y-6 mb-12">
+              <GimbalCard 
+                intensity={8}
+                className="bg-white border border-gray-100 p-8 rounded-[24px] shadow-sm"
+              >
+                <p className="font-semibold text-lg max-w-[280px] mx-auto text-[#17181d]">AI-verification of identity and payment methods in less than 2 mins on average</p>
+                <div className="w-16 h-1 bg-[#ffcf00] mx-auto mt-4 rounded-full"></div>
+              </GimbalCard>
+
+              <GimbalCard 
+                intensity={8}
+                className="bg-white border border-gray-100 p-8 rounded-[24px] shadow-sm"
+              >
+                <p className="font-semibold text-lg max-w-[280px] mx-auto text-[#17181d]">2-factor authentication of access to the account</p>
+                <div className="w-16 h-1 bg-[#ffcf00] mx-auto mt-4 rounded-full"></div>
+              </GimbalCard>
+
+              <GimbalCard 
+                intensity={8}
+                className="bg-white border border-gray-100 p-8 rounded-[24px] shadow-sm"
+              >
+                <p className="font-semibold text-lg max-w-[280px] mx-auto text-[#17181d]">Payment card data protection under PCI international standard</p>
+              </GimbalCard>
+            </div>
+
+            <p className="text-gray-600 mb-8 font-medium">Turn on 2FA and make your breathtaking trading journey safer with Bivaax</p>
+            
+            <button 
+               onClick={() => navigate('/register')}
+               className="w-full bg-[#ffcf00] hover:bg-[#e6bb00] text-black font-bold text-xl py-5 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition-colors mb-6"
+            >
+              Put helmet on <ArrowRight size={24} />
+            </button>
+            <p className="text-sm font-bold underline cursor-pointer">Step-by-step tutorial on activating 2FA is here</p>
+         </div>
+      </section>
+
+      {/* Platform Blog / Showcase Section */}
+      {stories.length > 0 && (
+        <section className="py-24 px-4 bg-gradient-to-b from-transparent to-black/20">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+              <div>
+                <div className="flex items-center gap-2 text-[#ffcf00] font-black text-[10px] uppercase tracking-[0.2em] mb-4">
+                  <Zap size={14} fill="currentColor" />
+                  <span>Platform Showcase</span>
+                </div>
+                <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter">Latest Updates & <br/><span className="text-[#ffcf00]">App Mechanics</span></h2>
+              </div>
+              <button 
+                onClick={() => navigateToBlog(navigate)} 
+                className="inline-flex items-center gap-2 text-[#ffcf00] font-bold hover:gap-3 transition-all group"
+              >
+                <span>View Full Blog</span>
+                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {stories.map((story, idx) => (
+                <motion.div 
+                  key={story.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.1 }}
+                >
+                  <GimbalCard
+                    intensity={12}
+                    className="bg-[#22232a] border border-white/10 rounded-[32px] overflow-hidden group hover:border-[#ffcf00]/30 transition-all duration-500 h-full"
+                  >
+                    <div className="aspect-video relative overflow-hidden">
+                      {story.imageUrl ? (
+                        <img 
+                          src={story.imageUrl} 
+                          alt={story.title} 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-white/5 text-gray-800">
+                          <ImageIcon size={48} />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
+                    </div>
+                    <div className="p-8">
+                      <h3 className="text-xl font-black uppercase tracking-tight mb-3 line-clamp-1 group-hover:text-[#ffcf00] transition-colors">{story.title}</h3>
+                      <p className="text-gray-500 text-sm line-clamp-2 leading-relaxed mb-6">
+                        {story.description}
+                      </p>
+                      <button 
+                        onClick={() => navigateToBlog(navigate)}
+                        className="text-[10px] font-black uppercase tracking-widest text-[#ffcf00] flex items-center gap-2 group/btn cursor-pointer"
+                      >
+                        <span>Read Details</span>
+                        <ArrowRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  </GimbalCard>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* FAQ Accordion Section */}
+      <section className="bg-[#1c1d22] py-24 px-4 border-t border-white/5 relative overflow-hidden">
+        {/* Subtle decorative glow for premium alignment */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-[#ffcf00]/5 blur-[100px] rounded-full pointer-events-none" />
+        
+        <div className="max-w-4xl mx-auto relative z-10 text-left">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 bg-[#ffcf00]/10 px-4 py-1.5 rounded-full border border-[#ffcf00]/20 text-[#ffcf00] mb-4 text-xs font-semibold uppercase tracking-wider">
+              <HelpCircle size={14} />
+              Frequently Asked Questions
+            </div>
+            <h2 className="text-3xl md:text-5xl font-black text-white tracking-tighter mb-4">
+              Have <span className="text-[#ffcf00]">questions?</span> We've got answers.
+            </h2>
+            <p className="text-gray-400 max-w-lg mx-auto text-sm leading-relaxed mb-8">
+              Find answers to common questions about setting up your account, deposits, copy trading, security protocols, and managing trades on Bivaax.
+            </p>
+            <input
+              type="text"
+              placeholder="Search questions..."
+              value={faqSearch}
+              onChange={(e) => setFaqSearch(e.target.value)}
+              className="w-full max-w-lg bg-[#22232a] border border-white/10 rounded-xl px-6 py-4 text-white placeholder-gray-500 focus:outline-none focus:border-[#ffcf00] transition-colors"
+            />
+          </div>
+
+          <div className="space-y-4">
+            {filteredFaqs.length > 0 ? (
+              filteredFaqs.map((faq, index) => {
+                const isOpen = openFaqIndex === index;
+                return (
+                  <GimbalCard
+                    key={`faq-item-${index}`}
+                    intensity={6}
+                    className="bg-[#22232a] border border-white/5 rounded-2xl overflow-hidden transition-all duration-300 hover:border-white/10"
+                  >
+                    <button
+                      onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                      className="w-full text-left px-6 py-5 flex items-center justify-between gap-4 font-bold text-white transition-colors hover:text-[#ffcf00] focus:outline-none"
+                    >
+                      <span className="text-[16px] md:text-lg tracking-tight leading-tight">{faq.question}</span>
+                      <span className={`flex-shrink-0 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 transition-all duration-300 ${isOpen ? 'rotate-180 bg-[#ffcf00]/10 text-[#ffcf00]' : ''}`}>
+                        <ChevronDown size={18} />
+                      </span>
+                    </button>
+                    <div 
+                      className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-60 opacity-100 border-t border-white/5' : 'max-h-0 opacity-0'}`}
+                    >
+                      <div className="px-6 py-5 text-gray-400 text-sm leading-relaxed font-normal bg-[#1e2026]">
+                        {faq.answer}
+                      </div>
+                    </div>
+                  </GimbalCard>
+                );
+              })
+            ) : (
+              <p className="text-center text-gray-500">No questions found matching your search.</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+
+      {/* Footer */}
+      <footer className="border-t border-white/5 bg-[#17181d]">
+        <div className="px-4 py-20">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+              <div className="col-span-1 md:col-span-2">
+                <div className="flex items-center gap-2.5 cursor-pointer group mb-6 select-none" onClick={() => navigate('/')}>
+                  <Logo size={32} withBackground={false} />
+                  <div className="flex flex-col">
+                    <span className="font-black text-white text-xl tracking-tight leading-none group-hover:text-[#ffcf00] transition-colors">Bivaax</span>
+                    <span className="text-[10px] text-[#ffcf00] font-black uppercase tracking-[0.25em] leading-none mt-0.5">Trade</span>
+                  </div>
+                </div>
+                <p className="mt-6 text-gray-500 max-w-sm leading-relaxed mb-8">
+                  Bivaax is a modern trading platform designed for high-performance financial execution. Join our global network today.
+                </p>
+                <div className="max-w-sm border-t border-white/5 pt-8">
+                  <NewsletterForm />
+                </div>
+                <div className="mt-8 flex gap-4">
+                  {[
+                    {
+                      name: 'youtube',
+                      url: 'https://youtube.com/@bivaax',
+                      icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2.5 7.1c-.2.7-.3 1.5-.3 2.5v4.8c0 1 .1 1.8.3 2.5.3 1.1 1.1 1.9 2.2 2.2.7.2 1.5.3 2.5.3h9.6c1 0 1.8-.1 2.5-.3 1.1-.3 1.9-1.1 2.2-2.2.2-.7.3-1.5.3-2.5V9.6c0-1-.1-1.8-.3-2.5-.3-1.1-1.1-1.9-2.2-2.2-.7-.2-1.5-.3-2.5-.3H7.2c-1 0-1.8.1-2.5.3-1.1.3-1.9 1.1-2.2 2.2z"></path>
+                          <path d="M10 15l5-3-5-3v6z"></path>
+                        </svg>
+                      )
+                    },
+                    {
+                      name: 'instagram',
+                      url: 'https://instagram.com/bivaax',
+                      icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                        </svg>
+                      )
+                    },
+                    {
+                      name: 'telegram',
+                      url: 'https://t.me/Bivaax_Official',
+                      icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21.5 2L2 10.5 7.5 13l2.5 7 2.5-4.5 5 4.5 2-18z"></path>
+                          <path d="M7.5 13l7.5-6.5-6 7.5"></path>
+                        </svg>
+                      )
+                    },
+                    {
+                      name: 'facebook',
+                      url: 'https://facebook.com/bivaax',
+                      icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                        </svg>
+                      )
+                    },
+                    {
+                      name: 'tiktok',
+                      url: 'https://tiktok.com/@bivaax',
+                      icon: (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path>
+                        </svg>
+                      )
+                    }
+                  ].map((social) => (
+                    <a key={`social-${social.name}`} href={social.url} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 hover:text-[#ffcf00] cursor-pointer text-white/70 transition-colors" title={social.name}>
+                      {social.icon}
+                    </a>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="font-black text-sm uppercase tracking-widest text-white mb-6">Company</h4>
+                <ul className="space-y-4 text-gray-500 text-sm font-bold">
+                  <li><Link to="/about-us" className="hover:text-[#ffcf00] transition-colors">About Us</Link></li>
+                  <li><button onClick={() => navigateToBlog(navigate)} className="hover:text-[#ffcf00] transition-colors cursor-pointer text-left">Platform Blog</button></li>
+                  <li><Link to="/page/contact" className="hover:text-[#ffcf00] transition-colors">Contact</Link></li>
+                  <li><Link to="/page/legal-agreement" className="hover:text-[#ffcf00] transition-colors">Legal Agreement</Link></li>
+                  <li><Link to="/page/risk-disclosure" className="hover:text-[#ffcf00] transition-colors">Risk Disclosure</Link></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-black text-sm uppercase tracking-widest text-white mb-6">Legal</h4>
+                <ul className="space-y-4 text-gray-500 text-sm font-bold">
+                  <li><Link to="/page/privacy-policy" className="hover:text-[#ffcf00] transition-colors">Privacy Policy</Link></li>
+                  <li><Link to="/page/terms-of-service" className="hover:text-[#ffcf00] transition-colors">Terms of Service</Link></li>
+                  <li><Link to="/page/aml-policy" className="hover:text-[#ffcf00] transition-colors">AML Policy</Link></li>
+                  <li><Link to="/page/payment-methods" className="hover:text-[#ffcf00] transition-colors">Payment Methods</Link></li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="pt-12 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div className="space-y-4">
+                <div className="text-[#ffcf00] font-black text-xs uppercase tracking-widest">Regulatory Status</div>
+                <p className="text-gray-500 text-xs leading-relaxed max-w-md">
+                  Bivaax is a category A member of the International Financial Commission, which guarantees the company's customers quality of service, transparency of relations, and protection from a neutral and independent dispute resolution organization.
+                </p>
+              </div>
+              <div className="flex flex-col md:items-end gap-6">
+                <div className="flex gap-6 text-white/50">
+                  <span className="font-black text-2xl tracking-tighter">VISA</span>
+                  <span className="font-black text-2xl tracking-tighter">MASTERCARD</span>
+                  <span className="font-black text-2xl tracking-tighter">BITCOIN</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-gray-500 text-[10px] uppercase font-black tracking-widest mb-1">Corporate Address</div>
+                  <div className="text-gray-400 text-xs font-medium">
+                    Dolphin Corp LLC, Euro House, Richmond Hill Road,<br/>Kingstown, St. Vincent and Grenadines
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-black/20 py-8 px-4">
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+            <p className="text-gray-600 text-xs font-medium">© 2014-2026 Bivaax Trading Platform. All rights reserved.</p>
+            <div className="flex items-center gap-8">
+              <Link to="/page/privacy-policy" className="text-gray-600 hover:text-white text-xs font-bold transition-colors">Privacy Policy</Link>
+              <Link to="/page/terms-of-service" className="text-gray-600 hover:text-white text-xs font-bold transition-colors">Terms Conditions</Link>
+              <div className="flex gap-4 ml-4">
+                <Smartphone size={16} className="text-gray-600 hover:text-white cursor-pointer transition-colors" />
+                <MessageCircle size={16} className="text-gray-600 hover:text-white cursor-pointer transition-colors" />
+                <Globe size={16} className="text-gray-600 hover:text-white cursor-pointer transition-colors" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-6xl mx-auto px-4 pt-12 pb-6 border-t border-white/5">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 text-[10px] text-gray-700 font-black uppercase tracking-[0.2em] opacity-40">
+            <span>Binary Options</span>
+            <span>Forex Trading</span>
+            <span>Digital Assets</span>
+            <span>Crypto Trading</span>
+            <span>Bivaax Trade</span>
+            <span>Professional Platform</span>
+            <span>Secure Trading</span>
+            <span>Market Analysis</span>
+            <span>Trading Terminal</span>
+            <span>Elite Trading</span>
+            <span>High Yields</span>
+          </div>
+        </div>
+
+        <div className="max-w-6xl mx-auto px-4 py-10">
+          <p className="text-[10px] text-gray-600 leading-relaxed text-center opacity-50 uppercase tracking-widest font-black">
+            Risk Warning: The financial operations offered on this site may involve increased risk. By using the financial services and tools this site offers, you may suffer serious financial loss, or completely lose the funds in your guaranteed trading account. Please evaluate all the financial risks and seek advice from an independent financial advisor before trading.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+

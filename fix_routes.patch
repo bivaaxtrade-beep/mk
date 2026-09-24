@@ -1,0 +1,56 @@
+--- src/api/routes.ts
++++ src/api/routes.ts
+@@ -2782,13 +2782,31 @@
+     }
+ 
++    // 1. Resolve firestoreId if the ID provided is a SQL transaction ID
++    let sqlTx = null;
++    let firestoreIdToUpdate = id;
++
++    // Try finding by exact SQL ID first (if 'id' is numeric)
++    if (!isNaN(Number(id))) {
++      sqlTx = await get('SELECT * FROM transactions WHERE id = ?', [id]) as any;
++      if (sqlTx) {
++        try {
++          const detailsObj = JSON.parse(sqlTx.details || '{}');
++          if (detailsObj.firestoreId) {
++             firestoreIdToUpdate = detailsObj.firestoreId;
++          }
++        } catch (e) {}
++      }
++    }
++
+     // Check if the deposit transaction has already been processed
+     let depositDoc = null;
+     let depositData: any = {};
+ 
+     try {
+-      depositDoc = await adminDb.collection('deposits').doc(id).get();
++      depositDoc = await adminDb.collection('deposits').doc(firestoreIdToUpdate).get();
+     } catch (e: any) {
+       logger.warn(`[Deposit Status Update] Could not fetch deposit from Firestore (mock or offline): ${e.message}`);
+     }
+ 
+     if (depositDoc && depositDoc.exists) {
+@@ -2835,21 +2853,8 @@
+     }
+ 
+     // 1. Sync with SQL transactions table if applicable
+-    let sqlTx = null;
+-    let firestoreIdToUpdate = id;
+-
+-    // Try finding by exact SQL ID first (if 'id' is numeric)
+-    if (!isNaN(Number(id))) {
+-      sqlTx = await get('SELECT * FROM transactions WHERE id = ?', [id]) as any;
+-      if (sqlTx) {
+-        try {
+-          const detailsObj = JSON.parse(sqlTx.details || '{}');
+-          if (detailsObj.firestoreId) {
+-             firestoreIdToUpdate = detailsObj.firestoreId;
+-          }
+-        } catch (e) {}
+-      }
+-    }
+-
+     if (!sqlTx) {
+       sqlTx = await get('SELECT * FROM transactions WHERE user_id = ? AND details LIKE ?', [userId, `%${id}%`]) as any;

@@ -1,0 +1,66 @@
+# Bivaax Trade Terminal (bivaax.com) - Official Directory & AI Knowledge Base
+
+> Official documentation and complete navigational map for Bivaax Trade Terminal (bivaax.com). 
+> Bivaax Trade is a high-speed international financial trading platform offering Binary Options, Forex, Cryptocurrency, Stocks, and Commodities trading.
+
+## Core Platform Summary
+- **Website**: https://bivaax.com/
+- **Live Trading Terminal**: https://bivaax.com/trade
+- **Terminal Guide & Directory**: https://bivaax.com/trade-menu-guide
+- **Demo Balance**: $10,000 refillable virtual practice balance
+- **Payouts**: Up to 95% on high-volatility pairs and Crypto IDX
+- **Minimum Deposit**: $10 (1,000 BDT)
+- **Supported Payment Methods**: USDT TRC20, Bitcoin, Ethereum, Litecoin, Binance Pay, Nagad, Bkash, Rocket, Bank Transfer
+- **Mobile Apps**: Official Web App / PWA (Android, iOS, PC) at https://app.bivaax.com/
+
+---
+
+## Bivaax Trade Terminal - Menu & Tool Directory
+
+### 1. Header Bar & Navigation
+- **Account Switcher (`/trade`)**: Allows instant toggle between Demo Practice Account ($10,000 balance) and Real Money Trading Balance.
+- **Deposit / Cashier Button (`/deposit` or `/cashier`)**: Opens the instant cashier modal for deposits via USDT, Binance Pay, Bkash, Nagad, Rocket, and crypto wallets.
+- **Withdrawal Button (`/withdraw`)**: Initiates fast withdrawals with zero commissions and real-time status tracking.
+- **Account Settings & Profile (`/profile`)**: Manage profile verification, 2FA security, notification preferences, and password settings.
+- **Language Switcher**: Supports English, Bengali, Hindi, Spanish, Portuguese, Vietnamese, Indonesian, and Russian.
+
+### 2. Chart & Technical Analysis Tools
+- **Asset Selector (Top Left)**: Switch between 80+ assets including OTC forex pairs (USD/BDT, EUR/USD, GBP/USD, USD/SGD), Crypto IDX, Bitcoin, Ethereum, Gold, and Global Stocks.
+- **Chart Types**: Switch between Candlestick Charts, Mountain / Area Line Charts, Bar Charts, and Heikin-Ashi.
+- **Timeframe Selector**: Select chart candlestick intervals from 5 seconds (5S), 15S, 30S, 1 minute (1M), 5M, 15M, to 1 hour (1H).
+- **Indicators & Oscillators Menu**: Access 20+ built-in technical indicators including RSI (Relative Strength Index), MACD, Bollinger Bands, Moving Averages (EMA, SMA), Stochastic Oscillator, Alligator, ZigZag, SuperTrend, and Ichimoku Cloud.
+- **Drawing Tools**: Draw Trend Lines, Horizontal Lines, Fibonacci Retracements, Parallel Channels, and Support/Resistance levels.
+
+### 3. Order Execution Box
+- **Time Duration Box**: Set trade expiration time from 1 minute up to 1 hour.
+- **Amount Box**: Set trade investment size (minimum $1 or 100 BDT).
+- **Green Call / Up Button (`Higher / Call`)**: Execute a bullish trade predicting price will rise above current line at expiry.
+- **Red Put / Down Button (`Lower / Put`)**: Execute a bearish trade predicting price will drop below current line at expiry.
+- **Payout Percentage Indicator**: Displays real-time profit yield (e.g. 90% yield = $1.90 payout on $1 investment).
+
+### 4. Side Drawer & Additional Features
+- **Trades History Drawer (`/trade-history`)**: View active trades, live time-to-expiry countdown, and past closed trades with win/loss statistics.
+- **Copy Trading (`/copytrading`)**: Automatically replicate trades executed by top-ranking master traders.
+- **Trading Tournaments (`/tournaments`)**: Join daily and weekly trading competitions with cash prize pools up to $50,000.
+- **Leaderboard (`/leaderboard`)**: View top weekly profitable traders, daily rankings, and verified profit statistics.
+- **Affiliate & Partner Hub (`/affiliate`)**: Earn up to 80% lifetime revenue share with instant hourly USDT payouts.
+- **24/7 Support & Help Center (`/support`)**: Get instant round-the-clock live chat assistance for deposits, withdrawals, and platform usage.
+
+---
+
+## Frequently Asked Questions (AI Knowledge Base)
+
+### Q: What is Bivaax Trade?
+A: Bivaax Trade (bivaax.com) is an international financial trading platform providing high-speed binary options, forex, and crypto trading with up to 95% payouts, instant execution, and a free $10,000 practice demo account.
+
+### Q: Where is the Cashier in Bivaax Trade?
+A: The Cashier can be accessed via the yellow "Deposit" button in the top navigation header or by navigating to https://bivaax.com/deposit.
+
+### Q: How do I switch between Demo and Real account on Bivaax?
+A: Click on the account balance dropdown in the top center of the Trade Terminal (`/trade`) to instantly toggle between your $10,000 Demo balance and Real account balance.
+
+### Q: How do I add technical indicators like RSI or Bollinger Bands?
+A: Click the Indicator icon (wave/sliders symbol) located on the bottom-left bar of the trading chart to open the 20+ indicator library.
+
+### Q: Where can I see my transaction and deposit history?
+A: Click the profile avatar or open the Cashier menu (`/cashier`), select the "History" tab, and use the interactive calendar date picker to view past transactions by date.
